@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Peminjaman - DKV Asset</title>
+    
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body { background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; font-family: 'Inter', sans-serif; }
+        .mobile-container { width: 100%; max-width: 480px; background: white; min-height: 100vh; position: relative; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        .header { background: #2c3e50; color: white; padding: 20px; text-align: center; border-radius: 0 0 20px 20px; }
+        .scan-area { padding: 20px; text-align: center; }
+        #reader { width: 100%; border-radius: 15px; overflow: hidden; background: #000; }
+        
+        /* Kartu Hasil Scan */
+        #result-card { display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: white; border-radius: 20px 20px 0 0; padding: 25px; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); z-index: 100; box-sizing: border-box; transition: transform 0.3s ease-out; transform: translateY(100%); }
+        #result-card.show { transform: translateY(0); }
+        
+        .item-info { text-align: center; margin-bottom: 20px; }
+        .item-img { width: 80px; height: 80px; background: #eee; border-radius: 10px; object-fit: cover; margin-bottom: 10px; }
+        .status-badge { padding: 5px 12px; border-radius: 15px; font-size: 12px; font-weight: bold; }
+        .badge-available { background: #d1fae5; color: #065f46; }
+        .badge-empty { background: #fee2e2; color: #991b1b; }
+        
+        .form-group { margin-bottom: 15px; text-align: left; }
+        .form-control { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        .btn-pinjam { width: 100%; padding: 15px; background: #3b82f6; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .btn-batal { width: 100%; padding: 15px; background: #f3f4f6; color: #374151; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    </style>
+
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+
+    <div class="mobile-container">
+        <div class="header">
+            <h3>📷 Scan QR Barang</h3>
+            <p style="font-size: 12px; opacity: 0.8;">Arahkan kamera ke label QR Barang</p>
+        </div>
+
+        <div class="scan-area">
+            <div id="reader"></div>
+            <p style="margin-top: 20px; color: #666; font-size: 14px;">Pastikan cahaya cukup terang</p>
+        </div>
+
+        <div id="result-card">
+            <div class="item-info">
+                <img id="img-barang" src="" class="item-img">
+                <h2 id="nama-barang" style="margin: 5px 0;">Nama Barang</h2>
+                <p id="kategori-barang" style="color: #666; font-size: 14px; margin-bottom: 5px;">Kategori</p>
+                <span id="stok-badge" class="status-badge badge-available">Stok: 5 Tersedia</span>
+            </div>
+
+            <div id="form-peminjaman">
+                <div class="form-group">
+                    <label style="font-size:12px; font-weight:bold; color:#555;">Nama Peminjam</label>
+                    <input type="text" id="nama-peminjam" class="form-control" placeholder="Tulis nama kamu..." required>
+                </div>
+                
+                <div class="form-group">
+                    <label style="font-size:12px; font-weight:bold; color:#555;">Durasi (Hari)</label>
+                    <select id="durasi-pinjam" class="form-control">
+                        <option value="1">1 Hari</option>
+                        <option value="3">3 Hari</option>
+                        <option value="7">7 Hari</option>
+                    </select>
+                </div>
+
+                <input type="hidden" id="id-barang">
+                <button onclick="prosesPinjam()" class="btn-pinjam">🔥 KONFIRMASI PINJAM</button>
+            </div>
+            
+            <button onclick="tutupPopup()" class="btn-batal">Batal / Scan Ulang</button>
+        </div>
+    </div>
+
+    <script src="js/supabase-config.js"></script> 
+    
+    <script>
+        // Inisialisasi Supabase (Mengambil dari file config di atas)
+        // const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); 
+        // ^ Baris ini biasanya sudah ada di supabase-config.js, jadi kita pakai variabel globalnya saja.
+
+        let html5QrcodeScanner;
+
+        function initScanner() {
+            html5QrcodeScanner = new Html5QrcodeScanner(
+                "reader", 
+                { fps: 10, qrbox: {width: 250, height: 250} },
+                /* verbose= */ false
+            );
+            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        }
+
+        // === SAAT QR TERDETEKSI ===
+        async function onScanSuccess(decodedText, decodedResult) {
+            console.log(`Scan result: ${decodedText}`, decodedResult);
+            
+            // 1. Hentikan kamera sementara
+            html5QrcodeScanner.clear();
+
+            // 2. Cari Data di Supabase
+            try {
+                Swal.fire({title: 'Mengecek...', didOpen: () => Swal.showLoading()});
+                
+                const { data, error } = await _supabase
+                    .from('assets')
+                    .select('*')
+                    .eq('id', decodedText)
+                    .single();
+
+                Swal.close();
+
+                if (error || !data) {
+                    Swal.fire('Error', 'Barang tidak ditemukan dalam database!', 'error').then(initScanner);
+                    return;
+                }
+
+                // 3. Tampilkan Data di Popup Bawah
+                tampilkanPopup(data);
+
+            } catch (err) {
+                console.error(err);
+                Swal.fire('Error', 'Gagal koneksi ke server', 'error').then(initScanner);
+            }
+        }
+
+        function onScanFailure(error) {
+            // Biarkan saja, ini error kalau kamera goyang/blur
+        }
+
+        function tampilkanPopup(barang) {
+            const card = document.getElementById('result-card');
+            const stokBadge = document.getElementById('stok-badge');
+            
+            document.getElementById('id-barang').value = barang.id;
+            document.getElementById('nama-barang').innerText = barang.name;
+            document.getElementById('kategori-barang').innerText = barang.category;
+            
+            // Foto (Kalau null pakai placeholder)
+            const imgUrl = barang.photo || barang.photo_url || 'https://via.placeholder.com/150?text=No+Image';
+            document.getElementById('img-barang').src = imgUrl;
+
+            // Cek Stok
+            const stok = barang.available_quantity || 0;
+            if (stok > 0) {
+                stokBadge.innerText = `✅ Stok Tersedia: ${stok}`;
+                stokBadge.className = 'status-badge badge-available';
+                document.getElementById('form-peminjaman').style.display = 'block';
+            } else {
+                stokBadge.innerText = `❌ Stok Habis!`;
+                stokBadge.className = 'status-badge badge-empty';
+                document.getElementById('form-peminjaman').style.display = 'none'; // Sembunyikan tombol pinjam
+            }
+
+            // Munculkan Kartu (Animasi Slide Up)
+            card.style.display = 'block';
+            setTimeout(() => card.classList.add('show'), 10);
+        }
+
+        function tutupPopup() {
+            const card = document.getElementById('result-card');
+            card.classList.remove('show');
+            setTimeout(() => {
+                card.style.display = 'none';
+                initScanner(); // Nyalakan kamera lagi
+            }, 300);
+        }
+
+        // === PROSES PINJAM ===
+        async function prosesPinjam() {
+            const idBarang = document.getElementById('id-barang').value;
+            const namaPeminjam = document.getElementById('nama-peminjam').value;
+            const durasi = parseInt(document.getElementById('durasi-pinjam').value);
+
+            if (!namaPeminjam) {
+                Swal.fire('Wajib', 'Isi nama peminjam dulu ya!', 'warning');
+                return;
+            }
+
+            // Hitung Tanggal Kembali
+            const tglPinjam = new Date();
+            const tglKembali = new Date();
+            tglKembali.setDate(tglPinjam.getDate() + durasi);
+
+            try {
+                Swal.fire({title: 'Memproses...', didOpen: () => Swal.showLoading()});
+
+                // 1. Catat di tabel Loans
+                const { error: errLoan } = await _supabase.from('loans').insert({
+                    asset_id: idBarang,
+                    borrower_name: namaPeminjam, // Kalau tabelmu pakai borrower_id, ini perlu disesuaikan
+                    loan_date: tglPinjam.toISOString(),
+                    return_date: tglKembali.toISOString(),
+                    status: 'Borrowed',
+                    quantity: 1
+                });
+
+                if (errLoan) throw errLoan;
+
+                // 2. Kurangi Stok di tabel Assets (RPC atau Manual)
+                // Kita pakai cara manual fetch-update biar simpel
+                const { data: asetLama } = await _supabase.from('assets').select('available_quantity').eq('id', idBarang).single();
+                const stokBaru = asetLama.available_quantity - 1;
+
+                const { error: errUpdate } = await _supabase.from('assets').update({ available_quantity: stokBaru }).eq('id', idBarang);
+
+                if (errUpdate) throw errUpdate;
+
+                // SUKSES!
+                Swal.fire({
+                    title: 'Berhasil!',
+                    text: 'Barang berhasil dipinjam. Jangan lupa kembalikan tepat waktu ya!',
+                    icon: 'success'
+                }).then(() => {
+                    tutupPopup(); // Reset
+                });
+
+            } catch (err) {
+                console.error(err);
+                Swal.fire('Gagal', 'Terjadi kesalahan sistem: ' + err.message, 'error');
+            }
+        }
+
+        // Jalankan Scanner saat halaman dimuat
+        document.addEventListener('DOMContentLoaded', initScanner);
+
+    </script>
+</body>
+</html>

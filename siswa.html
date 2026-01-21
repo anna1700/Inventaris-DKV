@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aplikasi Siswa - DKV Asset</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        /* CSS RESET & VARS */
+        :root { --primary: #2563eb; --bg: #f8fafc; --nav-height: 65px; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; padding: 0; font-family: 'Inter', sans-serif; background: var(--bg); padding-bottom: 80px; }
+
+        /* HEADER */
+        .header { background: white; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 10; }
+        .header h2 { margin: 0; font-size: 18px; color: #1e293b; }
+        .header p { margin: 2px 0 0; font-size: 12px; color: #64748b; }
+
+        /* TABS (VIEWS) */
+        .view-section { display: none; padding: 20px; animation: fadeIn 0.3s; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* KATALOG GRID */
+        .asset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .asset-card { background: white; border-radius: 12px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: 0.2s; }
+        .asset-card:active { transform: scale(0.98); }
+        .asset-img { width: 100%; height: 100px; object-fit: cover; border-radius: 8px; background: #f1f5f9; }
+        .asset-info h3 { font-size: 14px; margin: 8px 0 4px; color: #334155; }
+        .asset-info p { font-size: 11px; color: #64748b; margin: 0; }
+        .badge { display: inline-block; font-size: 10px; padding: 3px 8px; border-radius: 10px; margin-top: 5px; font-weight: 600; }
+        .bg-green { background: #dcfce7; color: #166534; }
+        .bg-red { background: #fee2e2; color: #991b1b; }
+
+        /* SCANNER UI */
+        #qr-reader { width: 100%; border-radius: 15px; overflow: hidden; background: #000; }
+        .scanner-container { text-align: center; }
+        .scanner-tip { font-size: 12px; color: #64748b; margin-top: 10px; }
+
+        /* PROFILE UI */
+        .profile-card { background: white; border-radius: 15px; padding: 20px; text-align: center; margin-bottom: 20px; }
+        .avatar { width: 80px; height: 80px; background: #e2e8f0; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 30px; color: #64748b; }
+        .btn-logout { background: #fee2e2; color: #ef4444; border: none; padding: 10px 20px; border-radius: 25px; font-size: 12px; font-weight: bold; margin-top: 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+        .loan-history { background: white; border-radius: 15px; overflow: hidden; }
+        .history-item { padding: 15px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+        .history-item:last-child { border: none; }
+
+        /* BOTTOM NAV */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: var(--nav-height); background: white; display: flex; justify-content: space-around; align-items: center; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 50; }
+        .nav-item { text-align: center; color: #94a3b8; font-size: 10px; cursor: pointer; flex: 1; }
+        .nav-item i { font-size: 20px; margin-bottom: 4px; display: block; }
+        .nav-item.active { color: var(--primary); font-weight: 600; }
+
+        /* MODAL POPUP */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; display: none; justify-content: center; align-items: flex-end; }
+        .modal-card { background: white; width: 100%; border-radius: 20px 20px 0 0; padding: 25px; animation: slideUp 0.3s; max-height: 90vh; overflow-y: auto; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        
+        /* FORM INPUTS */
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; color: #475569; }
+        .form-input { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; }
+        .btn-primary { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: 600; margin-top: 10px; cursor: pointer; }
+        .btn-secondary { width: 100%; padding: 14px; background: #f1f5f9; color: #475569; border: none; border-radius: 10px; font-weight: 600; margin-top: 10px; cursor: pointer; }
+        
+        .upload-box { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 15px; position: relative; cursor: pointer; }
+        .upload-icon { font-size: 24px; color: #94a3b8; margin-bottom: 5px; }
+        
+        /* Loading */
+        .loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index: 200; display:none; justify-content:center; align-items:center; flex-direction:column; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+
+    <script src="js/supabase-config.js"></script>
+
+    <script>
+        const sessionUser = localStorage.getItem('dkv_session_user');
+        if (!sessionUser) {
+            alert("Kamu belum login! Silakan login dulu.");
+            window.location.href = 'index.html'; 
+        }
+    </script>
+
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+</head>
+<body>
+
+    <div id="loading" class="loading-overlay">
+        <div class="spinner"></div>
+        <p style="margin-top:10px; font-size:12px; color:#666;">Memuat Data...</p>
+    </div>
+
+    <div id="view-home" class="view-section active">
+        <div class="header">
+            <h2>👋 Halo, Siswa DKV</h2>
+            <p>Mau pinjam apa hari ini?</p>
+            <input type="text" id="search-asset" placeholder="Cari nama barang..." class="form-input" style="margin-top:10px;" onkeyup="filterAssets()">
+        </div>
+        
+        <div style="padding-top: 20px;">
+            <div class="asset-grid" id="asset-list">
+                </div>
+        </div>
+    </div>
+
+    <div id="view-scan" class="view-section">
+        <div class="header">
+            <h2>📷 Scanner Aset</h2>
+            <p>Scan QR untuk Pinjam atau Kembali</p>
+        </div>
+        <div class="scanner-container" style="margin-top: 20px;">
+            <div id="qr-reader"></div>
+            <p class="scanner-tip">Arahkan kamera ke QR Code barang</p>
+            <button onclick="startCamera()" class="btn-primary" style="width:auto; padding: 10px 20px;">
+                <i class="fas fa-camera"></i> Mulai Kamera
+            </button>
+        </div>
+    </div>
+
+    <div id="view-profile" class="view-section">
+        <div class="header">
+            <h2>👤 Profil Saya</h2>
+            <p>Riwayat peminjamanmu</p>
+        </div>
+        <div style="padding-top: 20px;">
+            <div class="profile-card">
+                <div class="avatar"><i class="fas fa-user"></i></div>
+                <h3 id="user-name-display">Siswa</h3>
+                <p style="font-size:12px; color:#666;">Jurusan DKV</p>
+                
+                <button onclick="logoutSiswa()" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i> Keluar Akun
+                </button>
+            </div>
+            
+            <h4 style="margin-bottom:10px; padding: 0 5px;">Sedang Dipinjam</h4>
+            <div class="loan-history" id="active-loans">
+                <div style="padding:20px; text-align:center; color:#999; font-size:12px;">Tidak ada pinjaman aktif</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="switchTab('home')">
+            <i class="fas fa-home"></i> Katalog
+        </div>
+        <div class="nav-item" onclick="switchTab('scan')">
+            <i class="fas fa-qrcode"></i> Scan
+        </div>
+        <div class="nav-item" onclick="switchTab('profile')">
+            <i class="fas fa-user"></i> Profil
+        </div>
+    </div>
+
+    <div id="modal-action" class="modal-overlay">
+        <div class="modal-card">
+            <div style="text-align:center; margin-bottom:20px;">
+                <div style="width:40px; height:4px; background:#e2e8f0; border-radius:10px; margin:0 auto 10px;"></div>
+                <h3 id="modal-title" style="margin:0;">Judul Modal</h3>
+            </div>
+
+            <div style="background:#f8fafc; padding:15px; border-radius:10px; margin-bottom:20px; display:flex; align-items:center; gap:15px;">
+                <img id="modal-img" src="" style="width:60px; height:60px; object-fit:cover; border-radius:8px; background:#ddd;">
+                <div>
+                    <h4 id="modal-item-name" style="margin:0 0 5px;">Nama Barang</h4>
+                    <span id="modal-item-status" class="badge bg-green">Tersedia</span>
+                </div>
+            </div>
+
+            <div id="form-borrow" style="display:none;">
+                <div class="form-group">
+                    <label class="form-label">Nama Peminjam</label>
+                    <input type="text" id="borrower-name" class="form-input" placeholder="Nama Lengkapmu">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Durasi</label>
+                    <select id="borrow-duration" class="form-input">
+                        <option value="1">1 Hari</option>
+                        <option value="3">3 Hari</option>
+                    </select>
+                </div>
+                <button onclick="submitBorrow()" class="btn-primary">Konfirmasi Pinjam</button>
+            </div>
+
+            <div id="form-return" style="display:none;">
+                <div class="upload-box" onclick="document.getElementById('video-input').click()">
+                    <i class="fas fa-video upload-icon"></i>
+                    <p style="font-size:12px; margin:0; color:#64748b;">Tap untuk rekam video kondisi barang</p>
+                    <input type="file" id="video-input" accept="video/*" capture="environment" style="display:none" onchange="previewVideo()">
+                    <p id="video-name" style="font-size:10px; color:green; margin-top:5px;"></p>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Kondisi Barang</label>
+                    <select id="return-condition" class="form-input">
+                        <option value="Good">Baik / Normal</option>
+                        <option value="Damaged">Rusak / Bermasalah</option>
+                    </select>
+                </div>
+                <button onclick="submitReturn()" class="btn-primary" style="background:#059669;">Konfirmasi Pengembalian</button>
+            </div>
+
+            <button onclick="closeModal()" class="btn-secondary">Batal</button>
+        </div>
+    </div>
+
+    <script>
+        // --- GLOBAL VARIABLES ---
+        let currentAsset = null;
+        let currentLoanId = null;
+        let html5QrCode = null;
+        
+        // --- INIT ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAssets();
+            loadProfile();
+        });
+
+        // --- NAVIGATION ---
+        function switchTab(tabName) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById('view-' + tabName).classList.add('active');
+            
+            const navIndex = ['home', 'scan', 'profile'].indexOf(tabName);
+            document.querySelectorAll('.nav-item')[navIndex].classList.add('active');
+
+            if (tabName === 'scan') startCamera();
+            else stopCamera();
+
+            if (tabName === 'home') loadAssets();
+            if (tabName === 'profile') loadProfile();
+        }
+
+        // --- 1. FITUR KATALOG (HOME) ---
+        async function loadAssets() {
+            const { data, error } = await _supabase.from('assets').select('*').order('name');
+            if(error) return;
+
+            const container = document.getElementById('asset-list');
+            container.innerHTML = '';
+
+            data.forEach(item => {
+                const stok = item.available_quantity;
+                const badgeClass = stok > 0 ? 'bg-green' : 'bg-red';
+                const badgeText = stok > 0 ? `Sisa: ${stok}` : 'Habis';
+                const img = item.photo || item.photo_url || 'https://placehold.co/100?text=No+Img';
+
+                const card = `
+                    <div class="asset-card" onclick="alert('Silakan ke ruang aset untuk scan QR barang ini')">
+                        <img src="${img}" class="asset-img">
+                        <div class="asset-info">
+                            <h3>${item.name}</h3>
+                            <span class="badge ${badgeClass}">${badgeText}</span>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += card;
+            });
+        }
+
+        function filterAssets() {
+            const term = document.getElementById('search-asset').value.toLowerCase();
+            const cards = document.querySelectorAll('.asset-card');
+            cards.forEach(card => {
+                const name = card.querySelector('h3').innerText.toLowerCase();
+                card.style.display = name.includes(term) ? 'block' : 'none';
+            });
+        }
+
+        // --- 2. FITUR SCANNER & LOGIKA ---
+        function startCamera() {
+            if(html5QrCode) return;
+            html5QrCode = new Html5Qrcode("qr-reader");
+            html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScanSuccess);
+        }
+
+        function stopCamera() {
+            if(html5QrCode) {
+                html5QrCode.stop().then(() => html5QrCode = null);
+            }
+        }
+
+        async function onScanSuccess(decodedText) {
+            stopCamera();
+            showLoading(true);
+
+            try {
+                // 1. Ambil Data Barang
+                const { data: asset, error } = await _supabase.from('assets').select('*').eq('id', decodedText).single();
+                
+                if (error || !asset) {
+                    Swal.fire('Error', 'Barang tidak ditemukan', 'error').then(() => startCamera());
+                    return;
+                }
+                
+                currentAsset = asset;
+
+                // 2. CEK STATUS: Apakah User ini sedang meminjam barang ini?
+                const savedName = localStorage.getItem('dkv_user_name');
+                let isReturning = false;
+
+                if (savedName) {
+                    const { data: loans } = await _supabase
+                        .from('loans')
+                        .select('*')
+                        .eq('asset_id', asset.id)
+                        .eq('borrower_name', savedName)
+                        .eq('status', 'Borrowed')
+                        .single();
+                    
+                    if (loans) {
+                        isReturning = true;
+                        currentLoanId = loans.id;
+                    }
+                }
+
+                // 3. TAMPILKAN MODAL SESUAI STATUS
+                showModal(asset, isReturning);
+
+            } catch (err) {
+                console.error(err);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function showModal(asset, isReturning) {
+            const modal = document.getElementById('modal-action');
+            document.getElementById('modal-img').src = asset.photo || 'https://placehold.co/100';
+            document.getElementById('modal-item-name').innerText = asset.name;
+
+            if (isReturning) {
+                // MODE PENGEMBALIAN
+                document.getElementById('modal-title').innerText = "Kembalikan Barang";
+                document.getElementById('form-borrow').style.display = 'none';
+                document.getElementById('form-return').style.display = 'block';
+                document.getElementById('modal-item-status').innerText = "Sedang Kamu Pinjam";
+                document.getElementById('modal-item-status').className = "badge bg-red";
+            } else {
+                // MODE PEMINJAMAN
+                if(asset.available_quantity <= 0) {
+                    Swal.fire("Stok Habis", "Barang sedang kosong", "warning");
+                    return;
+                }
+                document.getElementById('modal-title').innerText = "Pinjam Barang";
+                document.getElementById('form-borrow').style.display = 'block';
+                document.getElementById('form-return').style.display = 'none';
+                document.getElementById('modal-item-status').innerText = `Stok: ${asset.available_quantity}`;
+                document.getElementById('modal-item-status').className = "badge bg-green";
+                
+                // Auto fill name
+                const savedName = localStorage.getItem('dkv_user_name');
+                if(savedName) document.getElementById('borrower-name').value = savedName;
+            }
+
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('modal-action').style.display = 'none';
+            startCamera(); 
+        }
+
+        // --- 3. LOGIKA PINJAM ---
+        async function submitBorrow() {
+            const name = document.getElementById('borrower-name').value;
+            const duration = parseInt(document.getElementById('borrow-duration').value);
+            
+            if(!name) return alert("Isi nama dulu!");
+            
+            localStorage.setItem('dkv_user_name', name);
+            showLoading(true);
+
+            const now = new Date();
+            const returnDate = new Date();
+            returnDate.setDate(now.getDate() + duration);
+
+            await _supabase.from('loans').insert({
+                asset_id: currentAsset.id,
+                borrower_name: name,
+                loan_date: now.toISOString(),
+                return_date: returnDate.toISOString(),
+                status: 'Borrowed',
+                quantity: 1
+            });
+
+            await _supabase.from('assets').update({ 
+                available_quantity: currentAsset.available_quantity - 1 
+            }).eq('id', currentAsset.id);
+
+            showLoading(false);
+            closeModal();
+            Swal.fire("Berhasil", "Barang berhasil dipinjam!", "success");
+        }
+
+        // --- 4. LOGIKA PENGEMBALIAN (DENGAN VIDEO) ---
+        function previewVideo() {
+            const file = document.getElementById('video-input').files[0];
+            if(file) document.getElementById('video-name').innerText = "Video Terpilih: " + file.name;
+        }
+
+        async function submitReturn() {
+            const videoFile = document.getElementById('video-input').files[0];
+            const condition = document.getElementById('return-condition').value;
+
+            if(!videoFile) return Swal.fire("Wajib Video", "Harap rekam kondisi barang dulu!", "warning");
+
+            showLoading(true);
+
+            try {
+                // A. UPLOAD VIDEO
+                const fileName = `return_${Date.now()}_${currentLoanId}.mp4`;
+                const { data: uploadData, error: uploadError } = await _supabase.storage
+                    .from('returns') // Pastikan bucket 'returns' ada di Supabase
+                    .upload(fileName, videoFile);
+
+                if (uploadError) throw uploadError;
+
+                const { data: urlData } = _supabase.storage.from('returns').getPublicUrl(fileName);
+                const videoUrl = urlData.publicUrl;
+
+                // B. UPDATE LOAN
+                await _supabase.from('loans').update({
+                    status: 'Returned',
+                    return_date: new Date().toISOString(),
+                    notes: `Kondisi: ${condition}. Bukti Video: ${videoUrl}`
+                }).eq('id', currentLoanId);
+
+                // C. UPDATE ASET
+                const { data: assetData } = await _supabase.from('assets').select('available_quantity').eq('id', currentAsset.id).single();
+                await _supabase.from('assets').update({
+                    available_quantity: assetData.available_quantity + 1,
+                    condition: condition 
+                }).eq('id', currentAsset.id);
+
+                showLoading(false);
+                closeModal();
+                Swal.fire("Terima Kasih", "Barang sudah dikembalikan & video terkirim.", "success");
+
+            } catch (err) {
+                console.error(err);
+                showLoading(false);
+                Swal.fire("Gagal", "Error saat upload video: " + err.message, "error");
+            }
+        }
+
+        // --- 5. LOGOUT ---
+        function logoutSiswa() {
+            if(confirm("Yakin mau keluar akun?")) {
+                localStorage.removeItem('dkv_session_user');
+                localStorage.removeItem('dkv_user_name');
+                window.location.href = 'index.html';
+            }
+        }
+
+        // --- HELPER ---
+        async function loadProfile() {
+            const name = localStorage.getItem('dkv_user_name');
+            if(!name) {
+                document.getElementById('user-name-display').innerText = "Siswa (Belum Ada Nama)";
+                return;
+            }
+
+            document.getElementById('user-name-display').innerText = name;
+            
+            const { data } = await _supabase.from('loans')
+                .select('*, assets(name, photo)')
+                .eq('borrower_name', name)
+                .eq('status', 'Borrowed');
+
+            const container = document.getElementById('active-loans');
+            if(data && data.length > 0) {
+                container.innerHTML = data.map(loan => `
+                    <div class="history-item">
+                        <div style="text-align:left;">
+                            <div style="font-weight:bold; font-size:14px;">${loan.assets.name}</div>
+                            <div style="font-size:10px; color:#666;">Dipinjam: ${new Date(loan.loan_date).toLocaleDateString()}</div>
+                        </div>
+                        <span class="badge bg-green">Aktif</span>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<div style="padding:20px; text-align:center; color:#999; font-size:12px;">Tidak ada pinjaman aktif</div>';
+            }
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'flex' : 'none';
+        }
+    </script>
+</body>
+</html>
